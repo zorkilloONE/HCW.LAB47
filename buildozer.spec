@@ -7,7 +7,7 @@ source.dir = .
 source.include_exts = py,png
 source.include_patterns = main.py,assets/*.png
 
-version = 1.0.1
+version = 1.0.2
 
 requirements = python3,kivy
 
@@ -29,6 +29,7 @@ android.accept_sdk_license = True
 android.private_storage = True
 android.allow_backup = True
 android.debug_artifact = apk
+android.release_artifact = apk
 
 p4a.branch = develop
 p4a.bootstrap = sdl2
