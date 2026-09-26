@@ -1,4 +1,4 @@
-name: Build HCW APK
+name: Build HCW Signed APK
 
 on:
   workflow_dispatch:
@@ -37,12 +37,6 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Preserve HCW debug signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: hcw-debug-keystore-v1
-
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
@@ -70,20 +64,46 @@ jobs:
           grep -q "android.api = 36" buildozer.spec
           grep -q "android.ndk = 29" buildozer.spec
           grep -q "android.archs = arm64-v8a" buildozer.spec
+          grep -q "android.release_artifact = apk" buildozer.spec
 
-      - name: Build Android debug APK
+      - name: Restore permanent HCW signing key
+        env:
+          HCW_KEYSTORE_BASE64: ${{ secrets.HCW_KEYSTORE_BASE64 }}
+          HCW_KEYSTORE_PASSWORD: ${{ secrets.HCW_KEYSTORE_PASSWORD }}
+          HCW_KEY_ALIAS: ${{ secrets.HCW_KEY_ALIAS }}
         run: |
-          buildozer -v android debug
+          test -n "$HCW_KEYSTORE_BASE64"
+          test -n "$HCW_KEYSTORE_PASSWORD"
+          test -n "$HCW_KEY_ALIAS"
+          printf '%s' "$HCW_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hcw-release-key.jks"
+          chmod 600 "$RUNNER_TEMP/hcw-release-key.jks"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/hcw-release-key.jks" \
+            -storepass "$HCW_KEYSTORE_PASSWORD" \
+            -alias "$HCW_KEY_ALIAS" >/dev/null
 
-      - name: Show APK
+      - name: Build permanently signed Android APK
+        env:
+          P4A_RELEASE_KEYSTORE: ${{ runner.temp }}/hcw-release-key.jks
+          P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.HCW_KEYSTORE_PASSWORD }}
+          P4A_RELEASE_KEYALIAS: ${{ secrets.HCW_KEY_ALIAS }}
+          P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.HCW_KEY_PASSWORD }}
+        run: |
+          buildozer -v android release
+
+      - name: Verify APK and signature
         run: |
           ls -lah bin/
-          test -n "$(find bin -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          APK="$(find bin -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          APKSIGNER="$(find "$HOME/.buildozer/android/platform/android-sdk/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
 
-      - name: Upload HCW APK
+      - name: Upload signed HCW APK
         uses: actions/upload-artifact@v4
         with:
-          name: HCW-Android-APK
+          name: HCW-Signed-Android-APK
           path: bin/*.apk
           if-no-files-found: error
           retention-days: 30
