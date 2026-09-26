@@ -4,18 +4,22 @@ package.name = hardcrazyworm
 package.domain = io.github.zorkilloone
 
 source.dir = .
-source.include_exts = py
-source.include_patterns = main.py
+source.include_exts = py,png
+source.include_patterns = main.py,assets/*.png
 
-version = 1.0.0
+version = 1.0.1
 
 requirements = python3,kivy
+
+presplash.filename = %(source.dir)s/assets/hcw_intro.png
+icon.filename = %(source.dir)s/assets/hcw_app_icon.png
 
 orientation = portrait
 fullscreen = 0
 
 author = Luis / zorkilloONE
 
+android.presplash_color = #000000
 android.api = 36
 android.minapi = 28
 android.ndk = 29
