@@ -8,6 +8,7 @@ on:
     paths:
       - "main.py"
       - "buildozer.spec"
+      - "assets/**"
       - ".github/workflows/build-apk.yml"
 
 permissions:
@@ -36,6 +37,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Preserve HCW debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: hcw-debug-keystore-v1
+
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
@@ -51,9 +58,15 @@ jobs:
           python -m pip install git+https://github.com/kivy/buildozer
           python -m pip install legacy-cgi setuptools cython==0.29.34
 
-      - name: Verify source
+      - name: Verify source and assets
         run: |
           python -m py_compile main.py
+          test -s assets/hcw_intro.png
+          test -s assets/hcw_app_icon.png
+          grep -q "source.include_exts = py,png" buildozer.spec
+          grep -q "source.include_patterns = main.py,assets/\*.png" buildozer.spec
+          grep -q "presplash.filename = %(source.dir)s/assets/hcw_intro.png" buildozer.spec
+          grep -q "icon.filename = %(source.dir)s/assets/hcw_app_icon.png" buildozer.spec
           grep -q "android.api = 36" buildozer.spec
           grep -q "android.ndk = 29" buildozer.spec
           grep -q "android.archs = arm64-v8a" buildozer.spec
