@@ -66,21 +66,39 @@ jobs:
           grep -q "android.archs = arm64-v8a" buildozer.spec
           grep -q "android.release_artifact = apk" buildozer.spec
 
-      - name: Restore permanent HCW signing key
+      - name: Diagnose and restore permanent HCW signing key
         env:
           HCW_KEYSTORE_BASE64: ${{ secrets.HCW_KEYSTORE_BASE64 }}
           HCW_KEYSTORE_PASSWORD: ${{ secrets.HCW_KEYSTORE_PASSWORD }}
           HCW_KEY_ALIAS: ${{ secrets.HCW_KEY_ALIAS }}
         run: |
-          test -n "$HCW_KEYSTORE_BASE64"
-          test -n "$HCW_KEYSTORE_PASSWORD"
-          test -n "$HCW_KEY_ALIAS"
-          printf '%s' "$HCW_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hcw-release-key.jks"
-          chmod 600 "$RUNNER_TEMP/hcw-release-key.jks"
-          keytool -list \
-            -keystore "$RUNNER_TEMP/hcw-release-key.jks" \
-            -storepass "$HCW_KEYSTORE_PASSWORD" \
-            -alias "$HCW_KEY_ALIAS" >/dev/null
+          set -euo pipefail
+          [ -n "$HCW_KEYSTORE_BASE64" ] || { echo "DIAG: HCW_KEYSTORE_BASE64 is missing"; exit 21; }
+          [ -n "$HCW_KEYSTORE_PASSWORD" ] || { echo "DIAG: HCW_KEYSTORE_PASSWORD is missing"; exit 22; }
+          [ -n "$HCW_KEY_ALIAS" ] || { echo "DIAG: HCW_KEY_ALIAS is missing"; exit 23; }
+
+          KEYSTORE="$RUNNER_TEMP/hcw-release-key.jks"
+          if ! printf '%s' "$HCW_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE"; then
+            echo "DIAG: HCW_KEYSTORE_BASE64 is not valid Base64"
+            exit 24
+          fi
+          chmod 600 "$KEYSTORE"
+
+          SIZE="$(wc -c < "$KEYSTORE")"
+          echo "DIAG: decoded keystore size=${SIZE} bytes"
+          [ "$SIZE" -gt 100 ] || { echo "DIAG: decoded keystore is unexpectedly small"; exit 25; }
+
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$HCW_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "DIAG: JKS/PKCS12 file or HCW_KEYSTORE_PASSWORD is invalid"
+            exit 26
+          fi
+          echo "DIAG: keystore opens successfully"
+
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$HCW_KEYSTORE_PASSWORD" -alias "$HCW_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "DIAG: HCW_KEY_ALIAS does not exist in the keystore"
+            exit 27
+          fi
+          echo "DIAG: signing alias exists"
 
       - name: Build permanently signed Android APK
         env:
