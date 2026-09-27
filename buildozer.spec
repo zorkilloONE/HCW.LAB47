@@ -1,5 +1,5 @@
 [app]
-title = HCW2Lab47
+title = HCW
 package.name = hcw2lab47
 package.domain = io.github.zorkilloone
 
