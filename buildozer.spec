@@ -1,13 +1,13 @@
 [app]
-title = Hard Crazy Worm
-package.name = hardcrazyworm
+title = HCW2Lab47
+package.name = hcw2lab47
 package.domain = io.github.zorkilloone
 
 source.dir = .
 source.include_exts = py,png
 source.include_patterns = main.py,assets/*.png
 
-version = 1.0.2
+version = 2.0.0
 
 requirements = python3,kivy
 
